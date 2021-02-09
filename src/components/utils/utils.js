@@ -19,10 +19,8 @@ export const zUtils = {
         return part;
       });
     },
-    deviceIsMobile2: function(id){
-      let e = document.getElementById(id);
-      console.log(`Element = ${e}`);
-      return window.getComputedStyle(e).display === 'none' ? true:false;
-    }
+    sortAsDates: function(array){
+      return array.sort((a, b) => new Date(a) - new Date(b));
+    },
   }
 }

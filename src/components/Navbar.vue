@@ -12,34 +12,42 @@
                     </b-navbar-item>
                 </template>
                 <template #start>
+                    <b-navbar-dropdown label="SES" 
+                        class="is-hidden-mobile">
+                        <b-navbar-item href="#" 
+                            class="button is-text is-small is-pulled-left "
+                            @click.prevent="getSESTemplates()"
+                            :disabled="!moreTemplatesAreAvailable || !awsCredentialsAreSet()">
+                            View Templates
+                        </b-navbar-item>
+                        <b-navbar-item
+                            @click.prevent="getSesStats()"
+                            class="button is-text is-small is-pulled-left">
+                            Email Stats
+                        </b-navbar-item>
+                        <hr class="dropdown-divider">
+                        <b-navbar-item href="/templates/get.html" 
+                            target="_blank"
+                            class="button is-text is-small is-pulled-left">
+                            Read Email (S3/public)
+                        </b-navbar-item>
+                    </b-navbar-dropdown>
+                    <b-navbar-item href="https://gum.co/fZLjG" 
+                        target="_blank"
+                        class="is-hidden-mobile">
+                            Subscribe
+                    </b-navbar-item>
                 </template>
                 <template #end>
-                    <b-navbar-item href="#" class="is-hidden-mobile">
-                        <a 
-                        :disabled="!moreTemplatesAreAvailable || !awsCredentialsAreSet()"
-                        @click="getSESTemplates()"
-                        class="button is-text">
-                            Get SES Templates
-                        </a>
-                    </b-navbar-item>
-                    <b-navbar-item href="#" class="is-hidden-mobile">
-                        <a href="https://zeer0.com/templates/get.html" 
-                            target="_blank"
-                            class="button is-text">
-                            Read Email from S3_<b-icon icon="open-in-new"></b-icon>
-                        </a>
-                    </b-navbar-item>
-                    <b-navbar-item tag="div" class="is-hidden-mobile">
-                        <a class="button is-dark" @click = "toggleSidebar()">
+                    <b-navbar-item tag="div" 
+                        class="is-hidden-mobile button is-dark p-2 m-2" 
+                        @click = "toggleSidebar()">
                             AWS Credentials
-                        </a>
                     </b-navbar-item>
-                    <b-navbar-item href="#" class="is-hidden-mobile">
-                        <a href="https://gum.co/fZLjG" 
-                            target="_blank"
-                            class="button is-text">
-                            Subscribe
-                        </a>
+                    <b-navbar-item
+                        @click="privacyPolicyIsVisible = true"
+                        class="is-hidden-mobile">
+                            Privacy Policy
                     </b-navbar-item>
                     <b-navbar-item class="is-hidden-desktop">
                         <p class="is-size-7 has-text-weight-semibold">
@@ -50,6 +58,18 @@
             </b-navbar>
         </div>
         <div class="column"></div>
+        <b-modal v-model="privacyPolicyIsVisible">
+            <div class="card content is-size-7">
+                <div class="card-content">
+                    <div class="content">
+                        <h1>Privacy Policy</h1>
+                        <p>- We don't ever receive or store your AWS Key, secret, and region information. It is saved in your browser and sent directly to Amazon AWS to download information relevant to YOU!</p>
+                        <p>- We use Google Analytics to see how our site is being used, not for advertising.</p>
+                        <p>- That's it!</p>
+                    </div>
+                </div>
+            </div>
+        </b-modal>
     </div>
 </template>
 
@@ -57,6 +77,7 @@
 export default {
   data() {
     return {
+        privacyPolicyIsVisible: undefined
     };
   },
   computed: {
@@ -82,6 +103,13 @@ export default {
   },
   methods: {
     awsCredentialsAreSet() { return this.$store.state.awsCredentialsAreSet || false; },
+    getSesStats: function() {
+        if(!this.awsCredentialsAreSet()) {
+            this.$store.commit('updateStateKeyAndValue', {'key': 'showMessageWithId', 'value': "AWS_MISSING"});
+            return;
+        }
+        this.$store.dispatch('getSesStats');
+    },
     getSESTemplates: function() {
         if(!this.awsCredentialsAreSet()) {
             this.$store.commit('updateStateKeyAndValue', {'key': 'showMessageWithId', 'value': "AWS_MISSING"});

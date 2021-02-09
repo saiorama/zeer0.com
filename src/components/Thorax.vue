@@ -1,42 +1,48 @@
 <template>
     <div class="columns">
         <div class="column has-text-centered is-hidden-mobile" id="col-1" ref="col-1">
-          <p v-if="!templates" class="content is-small has-text-weight-semibold">
+          <p v-if="!templates" class="content is-small has-text-grey has-text-weight-semibold">
             A list of your email templates will appear here
           </p>
-          <b-collapse
-            v-else
-            class="card"
-            animation="slide"
-            v-for="(template, index) of templates"
-            :key="template.Name"
-            :open="isOpen == index"
-            @open="showTemplate(index)">
-            <template #trigger="props">
-              <div
-                  class="card-header"
-                  :class="{'has-background-light' : isOpen == index}"
-                  role="button"
-              >
-                  <p class="card-header-title">
-                      {{ template.Name }}
-                  </p>
-                  <a class="card-header-icon">
-                      <b-icon
-                          :icon="props.open ? 'menu-down' : 'menu-up'">
-                      </b-icon>
-                  </a>
-              </div>
-            </template>
-            <div class="card-content">
-                <div class="content">
-                  <p> Created: {{ friendlyDate(template.CreatedTimestamp) }}</p>
-                  <b-button icon-left="shuffle-variant" @click.prevent="flipDisplayFormat">Show {{!showTextVersion ? 'Text':'Html'}} Version</b-button>
+          <div v-else class="is-size-7">
+            <b-button :disabled="!moreTemplatesAreAvailable" 
+            icon-left="refresh"
+            class="p-2 is-text is-size-7"
+            @click.prevent="getSESTemplates()">{{moreTemplatesAreAvailable ? 'Load More' : 'All Templates Loaded'}}
+            </b-button>
+            <b-collapse
+              class="card"
+              animation="slide"
+              v-for="(template, index) of templates"
+              :key="template.Name"
+              :open="isOpen == index"
+              @open="showTemplate(index)">
+              <template #trigger="props">
+                <div
+                    class="card-header"
+                    :class="{'has-background-light' : isOpen == index}"
+                    role="button"
+                >
+                    <p class="card-header-title">
+                        {{ template.Name }}
+                    </p>
+                    <a class="card-header-icon">
+                        <b-icon
+                            :icon="props.open ? 'menu-down' : 'menu-up'">
+                        </b-icon>
+                    </a>
                 </div>
-            </div>
-        </b-collapse>
+              </template>
+              <div class="card-content">
+                  <div class="content">
+                    <p> Created: {{ friendlyDate(template.CreatedTimestamp) }}</p>
+                    <b-button icon-left="shuffle-variant" @click.prevent="flipDisplayFormat" class=" is-size-7">Show {{!showTextVersion ? 'Text':'Html'}} Version</b-button>
+                  </div>
+              </div>
+            </b-collapse>
+          </div>
         </div>
-        <div class="column is-three-fifths content is-small has-text-weight-semibold">
+        <div class="column is-three-fifths content is-small has-text-grey has-text-weight-semibold">
           <div class="is-hidden-mobile">
             <div v-if="!htmlPart && !textPart">
               <div v-if="templates && templates.length > 0">
@@ -87,6 +93,33 @@
             <p v-else>-No text variables found-</p>
           </div>
         </div>
+        <b-modal v-model="sesStatsModalIsVisible">
+            <div class="card content is-size-7">
+              <div v-if="!sesStats">
+                <span>We could not find any email send stats associated with your SES account</span>
+              </div>
+              <div v-else>
+                <div class="table-container">
+                  <table class="table is-bordered is-striped is-narrow is-hoverable is-fullwidth">
+                    <thead>
+                      <h1>Email Send Statistics (last 15 days)</h1>
+                      <tr>
+                        <th>Date</th>
+                        <th v-for="(key, idx) in sesStatsKeys" :key="idx">{{key}}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="(sesStatDate, idx2) in this.sortAsDates(Object.keys(sesStats))" :key="idx2">
+                        <td>{{sesStatDate}}</td>
+                        <td v-for="(key, idx3) in sesStatsKeys" :key="idx3">{{sesStats[sesStatDate][key] ? sesStats[sesStatDate][key] : '-'}}</td>
+                      </tr>
+                    </tbody>
+                    <!-- Your table content -->
+                  </table>
+                </div>
+              </div>
+            </div>
+        </b-modal>
     </div>
 </template>
 
@@ -95,6 +128,18 @@ import moment from 'moment';
 import {zUtils} from './utils/utils'
 export default {
   computed: {
+    moreTemplatesAreAvailable() { 
+        return !this.$store.state.AWS.SES.templates ||
+            (this.$store.state.AWS.SES.templates &&
+            this.$store.state.AWS.SES.templates.length > 0 && 
+            this.$store.state.AWS.SES.templates.NextToken);
+    },
+    sesStats() {
+        return this.$store.state.sesStats;
+    },
+    sesStatsKeys() {
+        return this.$store.state.sesStatsKeys;
+    },
     showDialogCapturedValue() {
       return this.$store.state.showDialogCapturedValue || "";
     },
@@ -116,12 +161,14 @@ export default {
       ],
       htmlPart: undefined,
       isOpen: undefined,
+      sesStatsModalIsVisible: undefined,
       showTextVersion: false,
       textPart: undefined,
       variables: undefined,
     }
   },
   methods: {
+    awsCredentialsAreSet() { return this.$store.state.awsCredentialsAreSet || false; },
     clearScreen: function() {
       this.htmlPart = this.isOpen = this.textPart = this.variables = undefined;
       this.isOpen = false;
@@ -132,6 +179,17 @@ export default {
     friendlyDate: (date) => {
       if(typeof date === 'string') date = new Date(date);
       return moment(date).fromNow();
+    },
+    getSESTemplates: function() {
+      if(!this.awsCredentialsAreSet()) {
+          this.$store.commit('updateStateKeyAndValue', {'key': 'showMessageWithId', 'value': "AWS_MISSING"});
+          return;
+      }
+      if(this.moreTemplatesAreAvailable) {
+          this.$store.dispatch('getSESTemplates');
+      } else {
+          this.$store.commit('updateStateKeyAndValue', {'key': 'showMessageWithId', 'value': "NO_MORE_TEMPLATES"});
+      }
     },
     initializeVariables: function(type, withValues) {
       this.variables[type] = {};
@@ -173,6 +231,12 @@ export default {
     this.$store.commit('updateStateKeyAndValue', {'key': 'deviceIsDesktop', 'value': deviceIsDesktop});
   },
   watch: {
+    sesStats: function(neww){
+        this.sesStatsModalIsVisible = neww ? true: false;
+    },
+    sesStatsKeys: function(neww){
+        console.log(`new stats keys = ${neww}`);
+    },
     showDialogCapturedValue: function(neww) {
       if(neww) this.updatePlaceholderInVariables(neww);
     },

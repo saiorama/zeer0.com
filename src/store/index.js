@@ -40,6 +40,8 @@ let store = new Vuex.Store({
     region: "",
     secretAccessKey : undefined,
     sesRegions: SES_REGIONS,
+    sesStats: undefined,
+    sesStatsKeys: undefined,
     showDialogMessage: undefined,
     showDialogPlaceholder: undefined,
     showDialogCapturedValue: undefined,
@@ -92,7 +94,6 @@ let store = new Vuex.Store({
       if(!state.AWS.SES.templates && moreTemplates) state.AWS.SES.templates = [];
       if(moreTemplates.TemplatesMetadata) state.AWS.SES.templates.push(...moreTemplates.TemplatesMetadata);
       state.AWS.SES.templates.NextToken = moreTemplates.NextToken || undefined;
-      console.log(`SES templates = ${state.AWS.SES.templates}`);
     },
     updateStateKeyAndValue(state, newStateKeyAndValue){
       if(newStateKeyAndValue['key']){
@@ -132,16 +133,34 @@ let store = new Vuex.Store({
       }
       this.dispatch('validateLicense');
     },
-    validateLicense: function() {
-      let x = this.state.productLicense && 
-        this.state.productLicense.success && 
-        !this.state.productLicense.purchase.subscription_cancelled_at && 
-        !this.state.productLicense.purchase.subscription_failed_at;
-      this.commit('updateStateKeyAndValue', {'key' : 'productLicenseIsValid', 'value':x});
+    getSesStats: async function(){
+      this.commit('initializeSESObject');
+      if(this.state.AWS.SES.ses && this.state.productLicenseIsValid){
+        let x = [];
+        await this.state.AWS.SES.ses.getSendStatistics().promise()
+        .then(sendStats => {
+          return sendStats.SendDataPoints.reduce((accum, sendDataPoint) => {
+            let date = sendDataPoint.Timestamp.toLocaleDateString();
+            if(!accum[date]) accum[date] = {};
+            Object.keys(sendDataPoint).map(key => {
+              if(key !== 'Timestamp') {
+                if(!accum[date][key]) accum[date][key] = 0;
+                accum[date][key] += sendDataPoint[key] ? sendDataPoint[key] : 0;
+                if(!x.includes(key)) x.push(key);
+              }
+            });
+            return accum;
+          }, [])
+        })
+        .then(stats => {
+          this.commit('updateStateKeyAndValue', {key: 'sesStats', value: stats});
+          this.commit('updateStateKeyAndValue', {key: 'sesStatsKeys', value: x});
+        })
+        .catch(e => console.log(e));
+      }
     },
     getSESTemplates: async function() {
       this.commit('initializeSESObject', true);
-      console.log(`ses = ${this.state.AWS.SES.ses}, ${this.state.AWS.SES.templates}`)
       if(this.state.AWS.SES.ses && this.state.productLicenseIsValid){
         var params = { MaxItems: 10 };
         if(!this.state.AWS.SES.templates || 
@@ -152,7 +171,6 @@ let store = new Vuex.Store({
             this.state.AWS.SES.ses.listTemplates(params)
             .promise()
             .then(templates => {
-              console.log("Found templates", templates);
               this.commit('updateSESTemplatesList', templates);
             });
         }
@@ -168,6 +186,13 @@ let store = new Vuex.Store({
           this.commit('setCurrentTemplate', response.Template);
         })
       }
+    },
+    validateLicense: function() {
+      let x = this.state.productLicense && 
+        this.state.productLicense.success && 
+        !this.state.productLicense.purchase.subscription_cancelled_at && 
+        !this.state.productLicense.purchase.subscription_failed_at;
+      this.commit('updateStateKeyAndValue', {'key' : 'productLicenseIsValid', 'value':x});
     },
   },
   modules: {

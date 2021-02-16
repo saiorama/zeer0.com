@@ -53,7 +53,7 @@
               </div>
             </div>
             <div v-else>
-              <embed style="overflow:hidden;overflow-x:hidden;overflow-y:hidden;height:100vh;width:100%;" height="100vh" width="100vw" v-bind:src="!showTextVersion ? htmlPart:textPart"/>
+              <iframe style="overflow:hidden;overflow-x:hidden;overflow-y:hidden;height:100vh;width:100%;" height="100vh" width="100vw" v-bind:src="!showTextVersion ? htmlPart:textPart"/>
             </div>
           </div>
           <div class="is-hidden-desktop p-4" id="mobile-detector" ref="mobile-detector">

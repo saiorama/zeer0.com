@@ -8,6 +8,8 @@
                         <img
                             src="@/assets/zeer0.png"
                             alt="Home"
+                            width="100px"
+                            height="48px"
                         >
                     </b-navbar-item>
                 </template>
@@ -41,6 +43,7 @@
                 <template #end>
                     <b-navbar-item tag="div" 
                         class="is-hidden-mobile button is-dark p-2 m-2" 
+                        style="background-color:#f88379"
                         @click = "toggleSidebar()">
                             AWS Credentials
                     </b-navbar-item>
